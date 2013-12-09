@@ -1,16 +1,52 @@
 (ns bitconj.addresses
   "Tools for working with Bitcoin addresses."
-  (:use [bitconj.util :only [unhexlify hexlify to-base58]]
-        [bitconj.crypto :only [ripemd160 sha256]]))
+  (:use [clojure.set :only [map-invert]]
+        [bitconj.util :only [bytes->int int->bytes bytes-to-base bytes-from-base]]
+        [bitconj.crypto :only [ripemd160 sha256]])
+  (:import [java.security GeneralSecurityException]))
 
-(def address-version-byte (byte 0))
+(def checksum-size 4) ;; bytes
 
-(defn bytes->b58 [payload version]
-  (let [data (byte-array (cons version payload))
-        checksum (->> data sha256 sha256 (take 4))
-        [leading-zeroes rest] (split-with zero? data)]
-    (apply str (concat (map to-base58 leading-zeroes)
-                       (to-base58 (bytes->int (byte-array (concat rest checksum))))))))
+(def version-prefixes
+  {:pay-to-address (byte 0)
+   :pay-to-script-hash (byte 5)})
+
+(def versions-by-prefix (map-invert version-prefixes))
+
+(def b58-charset "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+
+(defn- encode-b58 [bytes]
+  (bytes-to-base bytes 58 b58-charset))
+
+(defn- decode-b58 [s]
+  (bytes-from-base s 58 b58-charset))
+
+(defn- make-checksum [bytes]
+  (->> bytes sha256 sha256))
+
+(defn- make-contents [version payload]
+  (byte-array (cons version payload)))
+
+(defn split-at-end [n coll]
+  (split-at (- (count coll) n) coll))
+
+(defn bytes->b58 [prefix payload]
+  (let [data (make-contents prefix payload)
+        checksum (->> data make-checksum (take checksum-size))]
+    (encode-b58 (byte-array (concat data checksum)))))
+
+(defn b58->bytes [s]
+  (let [[[prefix & payload] x-checksum] (split-at-end checksum-size (decode-b58 s))
+        data (make-contents version payload)
+        checksum (->> data make-checksum (take checksum-size))]
+    (if (not= checksum x-checksum)
+      (throw (GeneralSecurityException. "Base58Check checksum mismatch."))
+      [prefix payload])))
 
 (defn address-from-public-key [key]
-  (-> key sha256 ripemd160 (bytes->b58 address-version-byte)))
+  (->> key sha256 ripemd160 (bytes->b58 (:pay-to-address version-prefixes))))
+
+(defn decode-address [address]
+  (let [[prefix payload] (b58->bytes address)]
+    {:payload payload
+     :version (get versions-by-prefix prefix)}))
