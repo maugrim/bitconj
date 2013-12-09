@@ -1,8 +1,8 @@
 (ns bitconj.addresses
   "Tools for working with Bitcoin addresses."
   (:use [clojure.set :only [map-invert]]
-        [bitconj.util :only [bytes->int int->bytes bytes-to-base bytes-from-base]]
-        [bitconj.crypto :only [ripemd160 sha256]])
+        [bitconj.util :only [bytes->uint uint->bytes bytes-to-base bytes-from-base]]
+        [bitconj.crypto :only [ripemd160 sha256 d->keypair private-key public-key]])
   (:import [java.security GeneralSecurityException]))
 
 (def checksum-size 4) ;; bytes
@@ -22,7 +22,7 @@
   (bytes-from-base s 58 b58-charset))
 
 (defn- make-checksum [bytes]
-  (->> bytes sha256 sha256))
+  (-> bytes sha256 sha256))
 
 (defn- make-contents [version payload]
   (byte-array (cons version payload)))
@@ -37,11 +37,14 @@
 
 (defn b58->bytes [s]
   (let [[[prefix & payload] x-checksum] (split-at-end checksum-size (decode-b58 s))
-        data (make-contents version payload)
+        data (make-contents prefix payload)
         checksum (->> data make-checksum (take checksum-size))]
     (if (not= checksum x-checksum)
       (throw (GeneralSecurityException. "Base58Check checksum mismatch."))
       [prefix payload])))
+
+(defn address-from-passphrase [text]
+  (-> text .getBytes sha256 bytes->uint d->keypair public-key .getQ .getEncoded address-from-public-key))
 
 (defn address-from-public-key [key]
   (->> key sha256 ripemd160 (bytes->b58 (:pay-to-address version-prefixes))))

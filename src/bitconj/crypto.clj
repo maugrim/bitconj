@@ -1,6 +1,5 @@
 (ns bitconj.crypto
   "A wrapper for the Java libraries that do all the real crypto work."
-  (:use [bitconj.util :only [bytes->int]])
   (:import [org.bouncycastle.crypto.digests RIPEMD160Digest]
            [org.bouncycastle.jce ECNamedCurveTable]
            [org.bouncycastle.jce.provider BouncyCastleProvider]
@@ -40,7 +39,7 @@
   (let [ecdsa (make-signer)]
     (.initVerify ecdsa public-key)
     (.update ecdsa bytes)
-    (.verify signature)))
+    (.verify ecdsa signature)))
 
 (defn sha256 [bytes]
   (let [md (MessageDigest/getInstance "SHA-256")]

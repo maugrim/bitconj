@@ -3,11 +3,18 @@
   (:use [clojure.string :only [join]]
         [clojure.math.numeric-tower :only [floor expt]]))
 
-(defn bytes->int [bytes]
-  (BigInteger. bytes))
+(defn bytes->uint
+  "Returns the positive integer corresponding to the given big-endian bytes."
+  [bytes]
+  (BigInteger. 1 bytes))
 
-(defn int->bytes [n]
-  (.toByteArray (biginteger n)))
+(defn uint->bytes
+  "Returns a big-endian representation of the given positive integer."
+  [n]
+  ;; BigInteger.toByteArray returns two's-complement representation,
+  ;; so strip off a potential disambiguating leading zero byte
+  ;; (we never deal with negative numbers)
+  (->> (biginteger n) .toByteArray (drop-while zero?) byte-array))
 
 (defn to-base
   "Takes a base-10 integer N and converts it to base B."
@@ -35,7 +42,7 @@
   (let [b-zero (first chars)
         leading-zeroes (take-while zero? bytes)]
     (apply str (concat (map (fn [x] b-zero) leading-zeroes)
-                       (to-base (bytes->int bytes) b chars)))))
+                       (to-base (bytes->uint bytes) b chars)))))
 
 (defn bytes-from-base
   "Like from-base, but returns a byte array and retains leading zeroes
@@ -44,7 +51,7 @@
   (let [b-zero? (fn [d] (= d (first chars)))
         leading-zeroes (take-while b-zero? s)]
     (byte-array (concat (map (fn [x] (byte 0)) leading-zeroes)
-                        (int->bytes (from-base s b chars))))))
+                        (uint->bytes (from-base s b chars))))))
 
 (defn hexlify [bytes]
   (apply str (map #(format "%02X" %) bytes)))
