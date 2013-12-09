@@ -10,11 +10,13 @@
   (.toByteArray (biginteger n)))
 
 (defn to-base [n base chars]
-  (loop [remainder n result []]
-    (if (zero? remainder)
-      (join (reverse result))
-      (recur (floor (/ remainder base))
-             (conj result (nth chars (mod remainder base)))))))
+  (if (zero? n)
+    (first chars)
+    (loop [remainder n result []]
+      (if (zero? remainder)
+        (join (reverse result))
+        (recur (floor (/ remainder base))
+               (conj result (nth chars (mod remainder base))))))))
 
 (def b58-charset "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 (defn to-base58 [n]
