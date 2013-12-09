@@ -1,30 +1,46 @@
 (ns bitconj.crypto
   "A wrapper for the Java libraries that do all the real crypto work."
-  (:use [clojure.tools.trace]
-        [bitconj.util])
+  (:use [bitconj.util :only [bytes->int]])
   (:import [org.bouncycastle.crypto.digests RIPEMD160Digest]
            [org.bouncycastle.jce ECNamedCurveTable]
-           [org.bouncycastle.jce.spec ECParameterSpec]
-           [java.security KeyFactory KeyPair KeyPairGenerator MessageDigest SecureRandom]))
+           [org.bouncycastle.jce.provider BouncyCastleProvider]
+           [org.bouncycastle.jce.spec ECParameterSpec ECPrivateKeySpec ECPublicKeySpec]
+           [java.security KeyFactory KeyPair MessageDigest Security Signature]))
 
-(def default-curve "secp256k1")
+(Security/addProvider (BouncyCastleProvider.))
 
-(defn ecdsa-pair [curve-name]
-  (let [spec (ECNamedCurveTable/getParameterSpec curve-name)
-        gen (KeyPairGenerator/getInstance "ECDSA", "BC")
-        prng (SecureRandom.)]
-    (. gen (initialize spec prng))
-    (. gen (generateKeyPair))))
+(def curve-name "secp256k1")
+(def curve-params (ECNamedCurveTable/getParameterSpec curve-name))
+(def key-factory (KeyFactory/getInstance "ECDSA" "BC"))
 
-(defn ecdsa-from-pk []
-
-  )
+(defn d->keypair
+  "Generates an EC keypair from the 256-bit private key d."
+  [d]
+  (let [private (ECPrivateKeySpec. (biginteger d) curve-params)
+        public (ECPublicKeySpec. (.multiply (.getG curve-params) (biginteger d)) curve-params)]
+    (KeyPair. (.generatePublic key-factory public)
+              (.generatePrivate key-factory private))))
 
 (defn private-key [key-pair]
   (.getPrivate key-pair))
 
 (defn public-key [key-pair]
   (.getPublic key-pair))
+
+(defn- make-signer []
+  (Signature/getInstance "NONEwithECDSA" "BC"))
+
+(defn sign-using [bytes private-key]
+  (let [ecdsa (make-signer)]
+    (.initSign ecdsa private-key)
+    (.update ecdsa bytes)
+    (.sign ecdsa)))
+
+(defn sign-verify [bytes signature public-key]
+  (let [ecdsa (make-signer)]
+    (.initVerify ecdsa public-key)
+    (.update ecdsa bytes)
+    (.verify signature)))
 
 (defn sha256 [bytes]
   (let [md (MessageDigest/getInstance "SHA-256")]
