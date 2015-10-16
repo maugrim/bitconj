@@ -1,13 +1,4 @@
-# bitcoin-thing
+# bitconj
 
-A Clojure library designed to ... well, that part is up to you.
-
-## Usage
-
-FIXME
-
-## License
-
-Copyright © 2013 FIXME
-
-Distributed under the Eclipse Public License, the same as Clojure.
+Clojure code for interacting with Bitcoin stuff. Totally unfinished and WIP although some things work. You're on your
+own if you try to use this to do something with your precious bitcoins.
